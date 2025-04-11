@@ -1,0 +1,53 @@
+# Playbook pour restaurer une base de données MariaDB
+- name: Restaurer une base MariaDB
+  hosts: mysql         # Cible les hôtes du groupe 'mysql' /etc/ansible/host
+  become: yes          # Exécute les tâches avec les privilèges sudo
+
+  # Demande à l'utilisateur :
+  vars_prompt:
+    - name: db_name
+      prompt: "Nom de la base à restaurer"               # Nom de la base à recréer
+      private: no
+
+    - name: dump_filename
+      prompt: "Nom du fichier avec extension de la backup dans /tmp"  # Nom du fichier .sql de la sauvegarde
+      private: no
+
+  # Variables utilisées dans le script
+  vars:
+    mysql_root_user: arman              # Nom d'utilisateur root pour MySQL
+    mysql_root_password: arman          # Mot de passe root
+    dump_path: "/tmp/{{ dump_filename }}"  # Chemin complet vers le fichier de sauvegarde
+
+  tasks:
+    # Vérifie si le fichier de sauvegarde existe
+    - name: Vérifier que le fichier de backup existe
+      ansible.builtin.stat:
+        path: "{{ dump_path }}"
+      register: dump_file               # Enregistre le résultat dans une variable
+
+    # Arrête le script si le fichier n'existe pas
+    - name: Annuler si le fichier de dump n'existe pas
+      fail:
+        msg: "Le fichier '{{ dump_path }}' n'existe pas. Restauration annulée."
+      when: not dump_file.stat.exists
+
+    # Crée la base si elle n'existe pas déjà
+    - name: Créer la base si elle n'existe pas
+      community.mysql.mysql_db:
+        name: "{{ db_name }}"
+        state: present
+        login_user: "{{ mysql_root_user }}"
+        login_password: "{{ mysql_root_password }}"
+
+    # Restaure la base avec le fichier .sql
+    - name: Restaurer la base depuis le fichier
+      ansible.builtin.shell: >
+        mysql -u {{ mysql_root_user }} -p{{ mysql_root_password }} {{ db_name }} < {{ dump_path }}
+      args:
+        executable: /bin/bash
+
+    # Affiche un message de confirmation dans le terminal
+    - name: Afficher le résultat
+      debug:
+        msg: "Base '{{ db_name }}' restaurée depuis le fichier '{{ dump_path }}'"
