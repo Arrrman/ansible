@@ -1,0 +1,54 @@
+# Début du playbook : sauvegarde d'une base MariaDB avec timestamp
+- name: Sauvegarder une base MariaDB avec timestamp
+  hosts: mysql         # Cible les hôtes du groupe 'mysql' /etc/ansible/host
+  become: yes          # Exécute les tâches avec les privilèges sudo
+
+  # Demande à l'utilisateur le nom de la base à sauvegarder
+  vars_prompt:
+    - name: db_name
+      prompt: "Nom de la base à sauvegarder"
+      private: no
+
+  # Variables internes
+  vars:
+    mysql_root_user: root                 # Nom d'utilisateur root MariaDB
+    mysql_root_password: rootpassword     # Mot de passe root MariaDB
+
+    # Génère la date/heure actuelle
+    timestamp: "{{ lookup('pipe', 'date +%Y%m%d_%H%M%S') }}"
+
+    # Nom du fichier de sauvegarde avec timestamp
+    dump_filename: "{{ db_name }}_{{ timestamp }}.sql"
+
+    # Chemin du fichier de sauvegarde
+    dump_path: "/tmp/{{ dump_filename }}"
+
+  tasks:
+    # Vérifie si la base de données existe
+    - name: Vérifier si la base '{{ db_name }}' existe réellement
+      shell: |
+        mysql -u {{ mysql_root_user }} -p{{ mysql_root_password }} -e "SHOW DATABASES LIKE '{{ db_name }}';" | grep -w "{{ db_name }}"
+      register: db_check
+      failed_when: db_check.rc != 0      # Arrête le script si la base n'existe pas
+      changed_when: false
+
+    # Vérifie que la commande mysqldump est disponible
+    - name: Vérifier que mysqldump est disponible
+      command: which mysqldump
+      register: mysqldump_check
+      failed_when: mysqldump_check.rc != 0
+
+    # Sauvegarde la base dans un fichier .sql
+    - name: Sauvegarder la base de données
+      shell: >
+        mysqldump -u {{ mysql_root_user }} -p{{ mysql_root_password }} {{ db_name }} > {{ dump_path }}
+      args:
+        executable: /bin/bash
+
+    # Affiche le résultat dans le terminal
+    - name: Afficher le résultat de la sauvegarde
+      debug:
+        msg:
+          - "Sauvegarde terminée"
+          - "Base       : {{ db_name }}"
+          - "Fichier    : {{ dump_path }}"
