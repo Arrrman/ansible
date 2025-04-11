@@ -1,7 +1,10 @@
 # Début du playbook : sauvegarde d'une base MariaDB avec timestamp
 - name: Sauvegarder une base MariaDB avec timestamp
-  hosts: mysql         # Cible les hôtes du groupe 'mysql' /etc/ansible/host
+  hosts: mysql         # Cible les hôtes du groupe 'mysql' /etc/ansible/hosts
   become: yes          # Exécute les tâches avec les privilèges sudo
+
+  vars_files:
+    - group_vars/all.yml    # Charge les identifiants root depuis un fichier externe
 
   # Demande à l'utilisateur le nom de la base à sauvegarder
   vars_prompt:
@@ -11,10 +14,7 @@
 
   # Variables internes
   vars:
-    mysql_root_user: root                 # Nom d'utilisateur root MariaDB
-    mysql_root_password: rootpassword     # Mot de passe root MariaDB
-
-    # Génère la date/heure actuelle
+    # Génère la date/heure actuelle (ex: 20240411_153015)
     timestamp: "{{ lookup('pipe', 'date +%Y%m%d_%H%M%S') }}"
 
     # Nom du fichier de sauvegarde avec timestamp
@@ -32,7 +32,7 @@
       failed_when: db_check.rc != 0      # Arrête le script si la base n'existe pas
       changed_when: false
 
-    # Vérifie que la commande mysqldump est disponible
+    # Vérifie que la commande mysqldump est installée
     - name: Vérifier que mysqldump est disponible
       command: which mysqldump
       register: mysqldump_check
@@ -45,7 +45,7 @@
       args:
         executable: /bin/bash
 
-    # Affiche le résultat dans le terminal
+    # Affiche le résultat de la sauvegarde
     - name: Afficher le résultat de la sauvegarde
       debug:
         msg:
