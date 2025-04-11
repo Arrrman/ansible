@@ -1,7 +1,10 @@
 # Playbook pour restaurer une base de données MariaDB
 - name: Restaurer une base MariaDB
-  hosts: mysql         # Cible les hôtes du groupe 'mysql' /etc/ansible/host
-  become: yes          # Exécute les tâches avec les privilèges sudo
+  hosts: mysql          # Cible les hôtes du groupe 'mysql' /etc/ansible/hosts
+  become: yes           # Exécute les tâches avec les privilèges sudo
+
+  vars_files:
+    - group_vars/all.yml    # Charge les identifiants root depuis un fichier externe
 
   # Demande à l'utilisateur :
   vars_prompt:
@@ -10,13 +13,11 @@
       private: no
 
     - name: dump_filename
-      prompt: "Nom du fichier avec extension de la backup dans /tmp"  # Nom du fichier .sql de la sauvegarde
+      prompt: "Nom du fichier avec extension de la backup dans /tmp"  # Fichier .sql de la sauvegarde
       private: no
 
-  # Variables utilisées dans le script
+  # Variables internes
   vars:
-    mysql_root_user: arman              # Nom d'utilisateur root pour MySQL
-    mysql_root_password: arman          # Mot de passe root
     dump_path: "/tmp/{{ dump_filename }}"  # Chemin complet vers le fichier de sauvegarde
 
   tasks:
@@ -26,7 +27,7 @@
         path: "{{ dump_path }}"
       register: dump_file               # Enregistre le résultat dans une variable
 
-    # Arrête le script si le fichier n'existe pas
+    # Arrête le playbook si le fichier n'existe pas
     - name: Annuler si le fichier de dump n'existe pas
       fail:
         msg: "Le fichier '{{ dump_path }}' n'existe pas. Restauration annulée."
@@ -47,7 +48,7 @@
       args:
         executable: /bin/bash
 
-    # Affiche un message de confirmation dans le terminal
+    # Affiche un message de confirmation
     - name: Afficher le résultat
       debug:
         msg: "Base '{{ db_name }}' restaurée depuis le fichier '{{ dump_path }}'"
