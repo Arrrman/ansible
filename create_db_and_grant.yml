@@ -1,7 +1,10 @@
 # Crée une base de données et un utilisateur avec des droits personnalisés
 - name: Créer une base et un utilisateur avec droits personnalisés
-  hosts: mysql          # Cible les hôtes du groupe 'mysql' /etc/ansible/host
+  hosts: mysql          # Cible les hôtes du groupe 'mysql' /etc/ansible/hosts
   become: yes           # Exécute les tâches avec les privilèges sudo
+
+  vars_files:
+    - group_vars/all.yml    # Charge les identifiants root depuis un fichier externe
 
   # Demande les informations nécessaires à l'utilisateur
   vars_prompt:
@@ -14,27 +17,24 @@
       private: no
 
     - name: db_host
-      prompt: "Hôte autorisé pour l'utilisateur"    # Saisir l'adresse IP autorisée (ou % pour tous)
+      prompt: "Hôte autorisé pour l'utilisateur"    # IP ou % pour autoriser les connexions
       private: no
-      default: "127.0.0.1"                          # Par défaut, l'accès est local seulement
+      default: "127.0.0.1"                          # Par défaut : accès local uniquement
 
     - name: db_privileges
       prompt: |
         Droits à accorder (séparés par des virgules)
-        Exemples : SELECT,INSERT,UPDATE,DELETE      # Saisir les droits à accorder
+        Exemples : SELECT,INSERT,UPDATE,DELETE
       private: no
-      default: "SELECT"                             # Par défaut, seul le droit SELECT est donné
+      default: "SELECT"                             # Par défaut : droit SELECT uniquement
 
   # Variables internes
   vars:
+    # Génère automatiquement un mot de passe aléatoire de 16 caractères
     db_password: "{{ lookup('password', '/dev/null length=16 chars=ascii_letters,digits') }}"
-    # Génère automatiquement un mot de passe sécurisé pour l'utilisateur
-
-    mysql_root_user: arman                          # Utilisateur root MySQL
-    mysql_root_password: arman                      # Mot de passe root
 
   tasks:
-    # Crée la base de données
+    # Crée la base de données si elle n'existe pas
     - name: Créer la base de données
       community.mysql.mysql_db:
         name: "{{ db_name }}"
@@ -42,7 +42,7 @@
         login_user: "{{ mysql_root_user }}"
         login_password: "{{ mysql_root_password }}"
 
-    # Crée l'utilisateur avec le mot de passe généré
+    # Crée l'utilisateur avec un mot de passe généré automatiquement
     - name: Créer l'utilisateur avec mot de passe
       community.mysql.mysql_user:
         name: "{{ db_user }}"
@@ -52,7 +52,7 @@
         login_user: "{{ mysql_root_user }}"
         login_password: "{{ mysql_root_password }}"
 
-    # Attribue les droits spécifiés à l'utilisateur sur la base
+    # Donne à l'utilisateur les droits spécifiés sur la base
     - name: Attribuer les droits personnalisés à l'utilisateur
       community.mysql.mysql_user:
         name: "{{ db_user }}"
@@ -62,7 +62,7 @@
         login_user: "{{ mysql_root_user }}"
         login_password: "{{ mysql_root_password }}"
 
-    # Affiche un récapitulatif dans le terminal
+    # Affiche un résumé dans le terminal
     - name: Afficher les informations finales
       debug:
         msg:
