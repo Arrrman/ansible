@@ -1,0 +1,43 @@
+- name: Créer un utilisateur MariaDB
+  hosts: mysql                 # Cible les hôtes du groupe 'mysql' /etc/ansible/host
+  become: true                # Exécute les tâches avec les privilèges sudo
+
+  # Demande à l'utilisateur de saisir des variables depuis le terminal
+  vars_prompt:
+    - name: db_user
+      prompt: "Nom de l'utilisateur MariaDB"    # Saisie du nom de l'utilisateur à créer
+      private: no
+
+    - name: db_host
+      prompt: "Hôte autorisé (IP ou % pour tous)"  # Hôte autorisé à se connecter (ex: %, 127.0.0.1)
+      private: no
+      default: "127.0.0.1"                         # Par défaut le localhost est choisie
+
+  # Variables internes au playbook
+  vars:
+    # Mot de passe généré aléatoirement (16 caractères : lettres et chiffres)
+    db_password: "{{ lookup('password', '/dev/null length=16 chars=ascii_letters,digits') }}"
+
+    # Identifiants root pour se connecter à MariaDB
+    mysql_root_user: arman
+    mysql_root_password: arman
+
+  tasks:
+    # Création de l'utilisateur MariaDB sans privilèges
+    - name: Créer un utilisateur sans privilèges
+      community.mysql.mysql_user:
+        name: "{{ db_user }}"                # Nom de l'utilisateur
+        password: "{{ db_password }}"        # Mot de passe généré
+        host: "{{ db_host }}"                # Hôte autorisé à se connecter
+        state: present                       # Crée l'utilisateur s'il n'existe pas
+        login_user: "{{ mysql_root_user }}"  # Connexion à MariaDB avec le compte root
+        login_password: "{{ mysql_root_password }}"
+
+    # Affichage les informations
+    - name: Afficher les infos utilisateur
+      debug:
+        msg:
+          - "Utilisateur créé avec succès !"
+          - "Nom           : {{ db_user }}"
+          - "Mot de passe  : {{ db_password }}"
+          - "Hôte autorisé : {{ db_host }}"
